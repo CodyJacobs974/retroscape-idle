@@ -61,17 +61,26 @@ def initialize_player_from_load(player):
     if not load_game(player): # load_game returns True on success, False on failure/no file
         # If load failed or no save file, ensure default skills and inventory are initialized
         player.inventory = {} # Ensure inventory is an empty dict for new game
-        default_skills = {"Woodcutting": {"level": 1, "xp": 0}, "Mining": {"level": 1, "xp": 0}}
+        default_skills = {
+            "Woodcutting": {"level": 1, "xp": 0},
+            "Mining": {"level": 1, "xp": 0},
+            "Fishing": {"level": 1, "xp": 0} # Add Fishing
+        }
         for skill_name, defaults in default_skills.items():
             if skill_name not in player.skills:
                  player.skills[skill_name] = defaults.copy()
     else:
         # If load was successful, ensure all expected skills are present,
         # and inventory is correctly a dict.
+        player_instance_dict = player.__dict__ # Helper for checking if inventory was loaded
         if "inventory" not in player_instance_dict or not isinstance(player_instance_dict["inventory"], dict):
             player.inventory = {} # Initialize if missing or wrong type
 
-        default_skills = {"Woodcutting": {"level": 1, "xp": 0}, "Mining": {"level": 1, "xp": 0}}
+        default_skills = {
+            "Woodcutting": {"level": 1, "xp": 0},
+            "Mining": {"level": 1, "xp": 0},
+            "Fishing": {"level": 1, "xp": 0} # Add Fishing
+        }
         for skill_name, defaults in default_skills.items():
             if skill_name not in player.skills:
                 print(f"Adding missing skill '{skill_name}' to loaded game profile.")

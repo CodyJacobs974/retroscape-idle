@@ -3,7 +3,8 @@ import time
 from core.player import Player
 from core.game_io import save_game, initialize_player_from_load
 from skills.woodcutting import Woodcutting, TREES
-from skills.mining import Mining, ROCKS # Import Mining skill
+from skills.mining import Mining, ROCKS
+from skills.fishing import Fishing, FISH_DATA # Import Fishing skill
 
 # Global game state
 game_state = {
@@ -17,13 +18,18 @@ def initialize_game():
     """Initializes the game state, player, skills, etc."""
     player = game_state["player"]
 
-    initialize_player_from_load(player)
+    initialize_player_from_load(player) # game_io now handles adding missing skills including Fishing
 
-    # Ensure core skills exist if not loaded or if it's a new game
-    default_skills = {"Woodcutting": {"level": 1, "xp": 0}, "Mining": {"level": 1, "xp": 0}}
+    # Ensure core skills exist if not loaded or if it's a new game.
+    # This is a fallback/secondary check; primary is in game_io.initialize_player_from_load
+    default_skills = {
+        "Woodcutting": {"level": 1, "xp": 0},
+        "Mining": {"level": 1, "xp": 0},
+        "Fishing": {"level": 1, "xp": 0}
+    }
     for skill_name, defaults in default_skills.items():
         if skill_name not in player.skills:
-            player.skills[skill_name] = defaults
+            player.skills[skill_name] = defaults.copy() # Use .copy()
             print(f"Initialized new {skill_name} skill.")
         else:
             # Verify loaded skill data integrity
@@ -34,11 +40,12 @@ def initialize_game():
 
     # Setup skill managers
     game_state["active_managers"]["Woodcutting"] = Woodcutting(player)
-    game_state["active_managers"]["Mining"] = Mining(player) # Add Mining manager
+    game_state["active_managers"]["Mining"] = Mining(player)
+    game_state["active_managers"]["Fishing"] = Fishing(player) # Add Fishing manager
 
     print("Game ready.")
-    print("More trees and rocks are available as you level up!")
-    print("Base commands: 'wc <tree name>', 'mine <rock name>', 'stop', 'save', 'load', 'exit'")
+    print("More trees, rocks, and fishing spots are available as you level up!")
+    print("Base commands: 'wc <tree name>', 'mine <rock name>', 'fish <spot name>', 'stop', 'save', 'load', 'exit'")
 
 
 def process_input():
@@ -120,15 +127,25 @@ def render_ui():
                 if manager.is_mining and manager.current_rock:
                     item_name = manager.current_rock
                     action_verb = "Mining"
-                    depleted_at = manager.rock_depleted_at
+                    depleted_at = manager.rock_depleted_at # Depletion for rocks
                     current_activity_details = f"{action_verb} {item_name}"
                     if time.time() < depleted_at:
                         respawn_in = depleted_at - time.time()
                         current_activity_details += f" (Depleted, respawns in {respawn_in:.1f}s)"
+            elif player.active_skill == "Fishing":
+                if manager.is_fishing and manager.current_spot_name:
+                    item_name = manager.current_spot_name
+                    action_verb = "Fishing at"
+                    # Fishing spots don't "deplete" in the same way, more of a catch cooldown
+                    cooldown_end = manager.spot_depleted_at
+                    current_activity_details = f"{action_verb} {item_name}"
+                    if time.time() < cooldown_end:
+                        catch_in = cooldown_end - time.time()
+                        current_activity_details += f" (Next catch in {catch_in:.1f}s)"
 
         print(f"Current: {player.active_skill} - {current_activity_details}")
     else:
-        print("Current: Idle. Available commands: wc <tree name>, mine <rock name>, stop, save, load, exit")
+        print("Current: Idle. Available commands: wc <tree name>, mine <rock name>, fish <spot name>, 'stop', 'save', 'load', 'exit")
 
     print("="*30 + "\n")
 
@@ -143,41 +160,63 @@ def handle_command(command_str):
     player = game_state["player"]
     wc_manager = game_state["active_managers"]["Woodcutting"]
     mining_manager = game_state["active_managers"]["Mining"]
+    fishing_manager = game_state["active_managers"]["Fishing"] # Get fishing manager
 
     # Helper to stop any active skill
     def stop_all_actions():
         if player.active_skill:
             active_manager = game_state["active_managers"].get(player.active_skill)
             if active_manager:
-                if hasattr(active_manager, 'stop_cutting'): # Woodcutting
+                if hasattr(active_manager, 'stop_cutting'):
                     active_manager.stop_cutting()
-                elif hasattr(active_manager, 'stop_mining'): # Mining
+                elif hasattr(active_manager, 'stop_mining'):
                     active_manager.stop_mining()
-            player.clear_active_skill() # Ensure it's cleared even if manager doesn't exist or lacks method
-            # print("Stopped current action.") # Already printed by specific stop methods
+                elif hasattr(active_manager, 'stop_fishing'): # Add fishing
+                    active_manager.stop_fishing()
+            # player.clear_active_skill() # This is now handled by individual stop methods.
+            # It's good to ensure it's cleared if a manager lacks a stop method,
+            # but our current ones should handle it.
 
     if action == "wc":
         if len(parts) > 1:
-            tree_name_parts = [p.capitalize() for p in parts[1:]] # Capitalize each part of the name
-            tree_name = " ".join(tree_name_parts)
-            if tree_name in TREES:
-                stop_all_actions() # Stop other skills before starting a new one
-                wc_manager.start_cutting(tree_name)
+            # Join all parts after 'wc' then capitalize, to handle multi-word tree names
+            name_input = " ".join(parts[1:])
+            # The TREES keys are already capitalized properly, so direct comparison after input capitalization
+            # For more robust matching, could iterate keys and compare lowercased.
+            # For now, assume user types it reasonably close, or we make FISH_DATA keys also well-capitalized.
+            # The current fishing.py start_fishing has a loop to find match, which is better.
+            # Let's refine woodcutting and mining to use similar flexible name matching.
+
+            # For now, simple capitalization of input:
+            capitalized_name_input = " ".join([p.capitalize() for p in name_input.split()])
+
+            if capitalized_name_input in TREES:
+                stop_all_actions()
+                wc_manager.start_cutting(capitalized_name_input)
             else:
-                print(f"Unknown tree: '{tree_name}'. Available: {', '.join(TREES.keys())}")
+                print(f"Unknown tree: '{capitalized_name_input}'. Available: {', '.join(TREES.keys())}")
         else:
             print("Usage: wc <tree name> (e.g., wc Normal Tree)")
     elif action == "mine":
         if len(parts) > 1:
-            rock_name_parts = [p.capitalize() for p in parts[1:]] # Capitalize each part
-            rock_name = " ".join(rock_name_parts)
-            if rock_name in ROCKS:
-                stop_all_actions() # Stop other skills
-                mining_manager.start_mining(rock_name)
+            name_input = " ".join(parts[1:])
+            capitalized_name_input = " ".join([p.capitalize() for p in name_input.split()])
+            if capitalized_name_input in ROCKS:
+                stop_all_actions()
+                mining_manager.start_mining(capitalized_name_input)
             else:
-                print(f"Unknown rock: '{rock_name}'. Available: {', '.join(ROCKS.keys())}")
+                print(f"Unknown rock: '{capitalized_name_input}'. Available: {', '.join(ROCKS.keys())}")
         else:
             print("Usage: mine <rock name> (e.g., mine Copper Ore)")
+    elif action == "fish": # New command for fishing
+        if len(parts) > 1:
+            spot_name_input = " ".join(parts[1:])
+            # Fishing manager's start_fishing handles finding the spot name from FISH_DATA keys
+            # (it iterates and compares lowercased versions)
+            stop_all_actions()
+            fishing_manager.start_fishing(spot_name_input) # Pass the raw input
+        else:
+            print("Usage: fish <spot name> (e.g., fish Netting Spot)")
     elif action == "stop":
         if player.active_skill:
             stop_all_actions()
@@ -188,13 +227,13 @@ def handle_command(command_str):
     elif action == "load":
         stop_all_actions()
         initialize_player_from_load(player)
-        # Re-initialize all managers as player data might have changed
         game_state["active_managers"]["Woodcutting"] = Woodcutting(player)
         game_state["active_managers"]["Mining"] = Mining(player)
+        game_state["active_managers"]["Fishing"] = Fishing(player) # Re-initialize fishing manager
         print("Attempted to load game. Check messages for status.")
 
     elif action == "exit":
-        stop_all_actions() # Good practice to stop actions before save prompt
+        stop_all_actions()
         # Ask to save before exiting
         save_choice = input("Save before exiting? (yes/no): ").lower()
         if save_choice == 'yes' or save_choice == 'y':
@@ -303,17 +342,24 @@ def main():
                     if time.time() > wc_manager.tree_depleted_at:
                          tree_is_ready_for_input = True # Tree has respawned, player might want to change action
 
-                if player_is_idle or tree_is_ready_for_input : # tree_is_ready_for_input also implies player is active
-                    prompt_message = "Enter command (wc <tree name>, mine <rock name>, stop, exit): "
-                    if not player_is_idle : # Player is active, so one of the resources must have respawned
+                if player_is_idle or tree_is_ready_for_input :
+                    prompt_message = "Enter command (wc, mine, fish, stop, save, load, exit): "
+                    if not player_is_idle :
                         active_item_name = ""
-                        if player.active_skill == "Woodcutting" and wc_manager.current_tree:
-                            active_item_name = wc_manager.current_tree
-                        elif player.active_skill == "Mining" and mining_manager.current_rock:
-                            active_item_name = mining_manager.current_rock
+                        current_skill_manager = game_state["active_managers"].get(player.active_skill)
+                        if player.active_skill == "Woodcutting" and current_skill_manager and current_skill_manager.current_tree:
+                            active_item_name = current_skill_manager.current_tree
+                        elif player.active_skill == "Mining" and current_skill_manager and current_skill_manager.current_rock:
+                            active_item_name = current_skill_manager.current_rock
+                        elif player.active_skill == "Fishing" and current_skill_manager and current_skill_manager.current_spot_name:
+                             active_item_name = current_skill_manager.current_spot_name # This is a spot, not an item
 
                         if active_item_name:
-                             prompt_message = f"{active_item_name} respawned. Enter command or will continue: "
+                             # For fishing, "respawned" isn't quite right, "ready" or "next catch ready" is better.
+                             action_specific_message = "respawned"
+                             if player.active_skill == "Fishing":
+                                 action_specific_message = "ready for next catch"
+                             prompt_message = f"{active_item_name} {action_specific_message}. Enter command or will continue: "
 
                     command = input(prompt_message)
                     if command:
