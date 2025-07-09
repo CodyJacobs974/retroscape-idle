@@ -85,7 +85,7 @@ def render_ui():
     print("\n" * 2) # Print a few newlines
 
     print("="*30)
-    print("      🌳 Idle OSRS Lite 🌳")
+    print("🌳 Idle OSRS Lite 🌳")
     print("="*30)
 
     print("\n--- Skills ---")
@@ -122,6 +122,7 @@ def render_ui():
                     if time.time() < depleted_at:
                         respawn_in = depleted_at - time.time()
                         current_activity_details += f" (Depleted, respawns in {respawn_in:.1f}s)"
+
             elif player.active_skill == "Fishing":
                 if hasattr(manager, 'is_fishing') and manager.is_fishing and hasattr(manager, 'current_spot_name') and manager.current_spot_name:
                     item_name = manager.current_spot_name
@@ -138,8 +139,20 @@ def render_ui():
                         if remaining_time > 0:
                             current_activity_details += f" (ends in {remaining_time:.0f}s)"
                         else:
-                            current_activity_details += " (ending)"
-
+                            current_activity_details += " (ending)
+                            
+            elif player.active_skill == "Fishing": # Example for Fishing
+                if hasattr(manager, 'is_fishing') and manager.is_fishing and manager.current_spot:
+                    item_name = manager.current_spot
+                    action_verb = "Fishing at"
+                    # Fishing spots might not "deplete" in the same way, or have different mechanics
+                    current_activity_details = f"{action_verb} {item_name}"
+            elif player.active_skill == "Firemaking": # Example for Firemaking
+                 if hasattr(manager, 'is_burning') and manager.is_burning and manager.current_log:
+                    item_name = manager.current_log
+                    action_verb = "Burning"
+                    current_activity_details = f"{action_verb} {item_name}"
+ main
 
         print(f"Current: {player.active_skill} - {current_activity_details}")
     else:
