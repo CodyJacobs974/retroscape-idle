@@ -1,10 +1,16 @@
 import time
 
 # Define tree types and their properties
+# Merged TREES dictionary, prioritizing feature branch's more extensive list
+# and adjusting Oak Tree respawn time to align with feature branch.
 TREES = {
-    "Normal Tree": {"level_req": 1, "xp": 25, "log_id": "normal_log", "respawn_time": 5},
-    "Oak Tree": {"level_req": 15, "xp": 37.5, "log_id": "oak_log", "respawn_time": 10},
-    # Add more trees later
+    "Normal Tree":  {"level_req": 1,  "xp": 25,    "log_id": "normal_log",   "respawn_time": 5},
+    "Oak Tree":     {"level_req": 15, "xp": 37.5,  "log_id": "oak_log",      "respawn_time": 8}, # Adjusted from main's 10 to feature's 8
+    "Willow Tree":  {"level_req": 30, "xp": 67.5,  "log_id": "willow_log",   "respawn_time": 12},
+    "Teak Tree":    {"level_req": 35, "xp": 85,    "log_id": "teak_log",     "respawn_time": 15},
+    "Maple Tree":   {"level_req": 45, "xp": 100,   "log_id": "maple_log",    "respawn_time": 20},
+    "Mahogany Tree":{"level_req": 50, "xp": 125,   "log_id": "mahogany_log", "respawn_time": 25},
+    "Yew Tree":     {"level_req": 60, "xp": 175,   "log_id": "yew_log",      "respawn_time": 30},
 }
 
 class Woodcutting:
@@ -16,7 +22,7 @@ class Woodcutting:
 
     def start_cutting(self, tree_name):
         if tree_name not in TREES:
-            print(f"No such tree: {tree_name}")
+            print(f"No such tree: {tree_name}. Available: {', '.join(TREES.keys())}")
             return
 
         tree_data = TREES[tree_name]
@@ -27,12 +33,13 @@ class Woodcutting:
         self.is_cutting = True
         self.current_tree = tree_name
         self.player.set_active_skill("Woodcutting")
+        self.tree_depleted_at = 0 # Reset depletion timer for the new tree
         print(f"You start cutting {tree_name}...")
 
     def stop_cutting(self):
         if self.is_cutting:
             self.is_cutting = False
-            self.current_tree = None
+            # self.current_tree = None # Optional: clear current_tree, or leave for UI
             self.player.clear_active_skill()
             print("You stop cutting.")
 
@@ -42,33 +49,19 @@ class Woodcutting:
 
         tree_data = TREES[self.current_tree]
 
-        # Check if tree is depleted and needs to respawn
         if time.time() < self.tree_depleted_at:
-            # print(f"{self.current_tree} is depleted. Waiting for respawn...")
             return # Tree hasn't respawned yet
 
-
-        # Simulate cutting action (e.g., gain XP and logs periodically)
-        # For simplicity, let's say one action per update call if not depleted
-
-        # Action message will be handled by UI or more general message system if we add one.
-        # For now, direct print is okay for testing.
-        # print(f"You swing your axe at the {self.current_tree}.")
-
+        # Simulate cutting action
         self.player.add_xp("Woodcutting", tree_data["xp"])
-        self.player.add_item_to_inventory(tree_data["log_id"], 1) # Add 1 log to inventory
-        # Message updated in player.add_item_to_inventory
-        # print(f"You get a {tree_data['log_id']} and gain {tree_data['xp']} Woodcutting XP.")
+        self.player.add_item_to_inventory(tree_data["log_id"], 1)
+        # Player's add_item_to_inventory should handle the success message
 
-
-        # Tree gets depleted
         self.tree_depleted_at = time.time() + tree_data["respawn_time"]
         print(f"The {self.current_tree} is depleted. It will respawn in {tree_data['respawn_time']} seconds.")
-        # print(f"{self.current_tree} depleted. It will respawn in {tree_data['respawn_time']} seconds.")
 
-        # For continuous cutting until stopped by player:
-        # If we want the player to automatically switch or stop, add logic here.
-        # For now, it just waits for respawn and continues on the same tree.
-        # If we want it to stop:
+        # For continuous cutting until stopped by player (desired behavior for idle game):
+        # Do nothing here to stop it. It will continue on the same tree after respawn.
+        # If stop after one log:
         # self.stop_cutting()
         # print(f"The {self.current_tree} has been felled.")
