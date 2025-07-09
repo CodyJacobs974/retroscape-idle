@@ -53,7 +53,7 @@ def load_game(player_instance):
         print(f"Error loading game: {e}. Starting a new game.")
         # Reset player to a default state if load fails
         player_instance.skills = {} # Or re-initialize as new
-        # player_instance.inventory = []
+        # player_instance.inventory = [] # Commented out as inventory is a dict
         return False
 
 def initialize_player_from_load(player):
@@ -61,17 +61,31 @@ def initialize_player_from_load(player):
     if not load_game(player): # load_game returns True on success, False on failure/no file
         # If load failed or no save file, ensure default skills and inventory are initialized
         player.inventory = {} # Ensure inventory is an empty dict for new game
-        default_skills = {"Woodcutting": {"level": 1, "xp": 0}, "Mining": {"level": 1, "xp": 0}}
+        # Merged default_skills
+        default_skills = {
+            "Woodcutting": {"level": 1, "xp": 0},
+            "Mining": {"level": 1, "xp": 0},
+            "Fishing": {"level": 1, "xp": 0},
+            "Firemaking": {"level": 1, "xp": 0}
+        }
         for skill_name, defaults in default_skills.items():
             if skill_name not in player.skills:
                  player.skills[skill_name] = defaults.copy()
     else:
         # If load was successful, ensure all expected skills are present,
         # and inventory is correctly a dict.
+        # Using the inventory check from feature/inventory-and-mining-skill
+        player_instance_dict = player.__dict__
         if "inventory" not in player_instance_dict or not isinstance(player_instance_dict["inventory"], dict):
             player.inventory = {} # Initialize if missing or wrong type
 
-        default_skills = {"Woodcutting": {"level": 1, "xp": 0}, "Mining": {"level": 1, "xp": 0}}
+        # Merged default_skills
+        default_skills = {
+            "Woodcutting": {"level": 1, "xp": 0},
+            "Mining": {"level": 1, "xp": 0},
+            "Fishing": {"level": 1, "xp": 0},
+            "Firemaking": {"level": 1, "xp": 0}
+        }
         for skill_name, defaults in default_skills.items():
             if skill_name not in player.skills:
                 print(f"Adding missing skill '{skill_name}' to loaded game profile.")
