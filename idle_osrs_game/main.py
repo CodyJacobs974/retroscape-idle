@@ -1,5 +1,6 @@
 # Main entry point for the game.
 import time
+import os # Import os for screen clearing
 from core.player import Player
 from core.game_io import save_game, initialize_player_from_load
 from skills.woodcutting import Woodcutting, TREES
@@ -91,68 +92,111 @@ def render_ui():
     wc_xp = player.get_skill_xp("Woodcutting")
     xp_needed = player.xp_for_next_level(wc_level)
 
-    # Basic clearing of the console for a cleaner look (works on most systems)
-    # For more sophisticated UIs, a library like 'curses' would be needed.
-    # print("\033c", end="") # Clears console - might be too aggressive for some terminals/OS
+    # Attempt to clear console for a cleaner UI render
+    # This is OS dependent. 'cls' for Windows, 'clear' for macOS/Linux.
+    # A small helper function could make this cleaner.
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-    print("\n" + "="*30)
-    print("      🌳 Idle OSRS Lite 🌳")
-    print("="*30)
+    screen_width = 80 # Define a conceptual screen width for formatting
 
-    # Player Skills
-    print("\n--- Skills ---")
-    for skill_name in player.skills.keys(): # Iterate through all available skills
+    # --- Title Bar ---
+    title = "🌳 Idle OSRS Lite 🌳"
+    print("=" * screen_width)
+    print(title.center(screen_width))
+    print("=" * screen_width)
+
+    # --- Main Content Area (Skills, Inventory, Activity) ---
+    # For simplicity, we'll interleave them for now, rather than true side-by-side panels without curses.
+
+    # --- Skills Panel ---
+    print("\n-- Skills --".ljust(screen_width, "-"))
+    skills_lines = []
+    for skill_name in sorted(player.skills.keys()): # Sort skills alphabetically
         level = player.get_skill_level(skill_name)
         xp = player.get_skill_xp(skill_name)
         xp_needed_for_next = player.xp_for_next_level(level)
-        print(f"{skill_name}: Level {level} (XP: {xp}/{xp_needed_for_next})")
+        skills_lines.append(f"{skill_name:<12}: Level {level:<3} (XP: {xp:>7}/{xp_needed_for_next:<7})")
 
-    # Inventory Display
-    print("\n--- Inventory ---")
-    print(player.get_inventory_display())
+    # Basic two-column display for skills if many, otherwise single column
+    if len(skills_lines) > 4 and screen_width > 60 : # Arbitrary threshold for two columns
+        half_len = (len(skills_lines) + 1) // 2
+        for i in range(half_len):
+            line = skills_lines[i].ljust(screen_width // 2 -1)
+            if i + half_len < len(skills_lines):
+                line += "| " + skills_lines[i + half_len]
+            print(line)
+    else:
+        for line in skills_lines:
+            print(line)
+    print("-" * screen_width)
 
-    # Current Activity
-    print("\n--- Activity ---")
+    # --- Inventory Panel ---
+    print("\n-- Inventory --".ljust(screen_width, "-"))
+    inventory_display = player.get_inventory_display() # This already returns a string
+    # We might want to reformat get_inventory_display for better panel fitting later.
+    # For now, just print it. Max 3 items per line for example.
+    items = list(player.inventory.items())
+    if not items:
+        print("Empty")
+    else:
+        items_per_line = 3
+        for i in range(0, len(items), items_per_line):
+            line_items = []
+            for j in range(items_per_line):
+                if i + j < len(items):
+                    item_id, qty = items[i+j]
+                    line_items.append(f"{item_id.replace('_', ' ').title()}: {qty}")
+
+            # Refined column width calculation
+            num_separators = items_per_line - 1
+            separator_width = num_separators * 3 # Each " | " is 3 chars
+            available_width_for_items = screen_width - separator_width
+            column_content_width = available_width_for_items // items_per_line if items_per_line > 0 else available_width_for_items
+
+            print(" | ".join(item_str.ljust(column_content_width) for item_str in line_items) )
+    print("-" * screen_width)
+
+    # --- Activity/Message Panel (Placeholder) ---
+    print("\n-- Current Activity --".ljust(screen_width, "-"))
+    activity_message = "Idle"
     if player.active_skill:
         current_activity_details = "Unknown Action"
         manager = game_state["active_managers"].get(player.active_skill)
-        if manager:
-            if player.active_skill == "Woodcutting":
-                if manager.is_cutting and manager.current_tree:
-                    item_name = manager.current_tree
-                    action_verb = "Chopping"
-                    depleted_at = manager.tree_depleted_at
-                    current_activity_details = f"{action_verb} {item_name}"
-                    if time.time() < depleted_at:
-                        respawn_in = depleted_at - time.time()
-                        current_activity_details += f" (Depleted, respawns in {respawn_in:.1f}s)"
-            elif player.active_skill == "Mining":
-                if manager.is_mining and manager.current_rock:
-                    item_name = manager.current_rock
-                    action_verb = "Mining"
-                    depleted_at = manager.rock_depleted_at # Depletion for rocks
-                    current_activity_details = f"{action_verb} {item_name}"
-                    if time.time() < depleted_at:
-                        respawn_in = depleted_at - time.time()
-                        current_activity_details += f" (Depleted, respawns in {respawn_in:.1f}s)"
-            elif player.active_skill == "Fishing":
-                if manager.is_fishing and manager.current_spot_name:
-                    item_name = manager.current_spot_name
-                    action_verb = "Fishing at"
-                    # Fishing spots don't "deplete" in the same way, more of a catch cooldown
-                    cooldown_end = manager.spot_depleted_at
-                    current_activity_details = f"{action_verb} {item_name}"
-                    if time.time() < cooldown_end:
-                        catch_in = cooldown_end - time.time()
-                        current_activity_details += f" (Next catch in {catch_in:.1f}s)"
+        if manager: # Ensure manager exists
+            if player.active_skill == "Woodcutting" and hasattr(manager, 'is_cutting') and manager.is_cutting and manager.current_tree:
+                item_name = manager.current_tree
+                action_verb = "Chopping"
+                depleted_at = manager.tree_depleted_at
+                current_activity_details = f"{action_verb} {item_name}"
+                if time.time() < depleted_at:
+                    respawn_in = depleted_at - time.time()
+                    current_activity_details += f" (Depleted, respawns in {respawn_in:.1f}s)"
+            elif player.active_skill == "Mining" and hasattr(manager, 'is_mining') and manager.is_mining and manager.current_rock:
+                item_name = manager.current_rock
+                action_verb = "Mining"
+                depleted_at = manager.rock_depleted_at
+                current_activity_details = f"{action_verb} {item_name}"
+                if time.time() < depleted_at:
+                    respawn_in = depleted_at - time.time()
+                    current_activity_details += f" (Depleted, respawns in {respawn_in:.1f}s)"
+            elif player.active_skill == "Fishing" and hasattr(manager, 'is_fishing') and manager.is_fishing and manager.current_spot_name:
+                item_name = manager.current_spot_name
+                action_verb = "Fishing at"
+                cooldown_end = manager.spot_depleted_at
+                current_activity_details = f"{action_verb} {item_name}"
+                if time.time() < cooldown_end:
+                    catch_in = cooldown_end - time.time()
+                    current_activity_details += f" (Next catch in {catch_in:.1f}s)"
+        activity_message = f"Active: {player.active_skill} - {current_activity_details}"
 
-        print(f"Current: {player.active_skill} - {current_activity_details}")
-    else:
-        # Firemaking isn't an "active skill" in the same way, so it's not listed here.
-        # Player is idle if no continuous skill is active.
-        print("Current: Idle. Available commands: wc, mine, fish, burn, stop, save, load, exit")
+    print(activity_message)
+    # TODO: Add a message log here for recent events (XP gain, items, etc.)
+    print("-" * screen_width)
 
-    print("="*30 + "\n")
+    # --- Input Line ---
+    # The input prompt itself is handled in the main loop after render_ui is called.
+    # We just need to ensure there's space and it's clear.
+    print("=" * screen_width)
 
 
 def handle_command(command_str):
