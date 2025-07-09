@@ -64,7 +64,8 @@ def initialize_player_from_load(player):
         default_skills = {
             "Woodcutting": {"level": 1, "xp": 0},
             "Mining": {"level": 1, "xp": 0},
-            "Fishing": {"level": 1, "xp": 0} # Add Fishing
+            "Fishing": {"level": 1, "xp": 0},
+            "Firemaking": {"level": 1, "xp": 0} # Add Firemaking
         }
         for skill_name, defaults in default_skills.items():
             if skill_name not in player.skills:
@@ -79,7 +80,8 @@ def initialize_player_from_load(player):
         default_skills = {
             "Woodcutting": {"level": 1, "xp": 0},
             "Mining": {"level": 1, "xp": 0},
-            "Fishing": {"level": 1, "xp": 0} # Add Fishing
+            "Fishing": {"level": 1, "xp": 0},
+            "Firemaking": {"level": 1, "xp": 0} # Add Firemaking
         }
         for skill_name, defaults in default_skills.items():
             if skill_name not in player.skills:
